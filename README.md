@@ -1,6 +1,6 @@
 # report
 
-report examines a git repo's commit log and determines if it follows the [50/72 rule](https://preslav.me/2015/02/21/what-s-with-the-50-72-rule/) rule
+report examines a git repo's commit log and determines if it follows the [50/72 rule](https://preslav.me/2015/02/21/what-s-with-the-50-72-rule/).
 
 ## Build
 ````
