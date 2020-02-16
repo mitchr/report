@@ -66,7 +66,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	commits := []*commit{}
+	var commits []*commit
 
 	_, err := os.Stat(gitDir)
 	// if there was an error, then this is a local directory
@@ -76,9 +76,10 @@ func main() {
 		authors := parseGitLog(gitDir, "\"%an <%ae>\"")
 		hashes := parseGitLog(gitDir, "\"%H\"")
 
+		commits = make([]*commit, len(hashes))
 		for i := range hashes {
 			c := newCommit(subjs[i], bodies[i], authors[i], hashes[i])
-			commits = append(commits, c)
+			commits[i] = c
 		}
 
 	// if there was no error, its a github repo
@@ -112,7 +113,8 @@ func main() {
 		container := []node{}
 		json.Unmarshal([]byte(body), &container)
 
-		for _, v := range container {
+		commits = make([]*commit, len(container))
+		for i, v := range container {
 			splitMsg := strings.SplitN(v.Commit.Message, "\n\n", 2)
 			subj := splitMsg[0]
 			msg := ""
@@ -121,7 +123,7 @@ func main() {
 			}
 
 			c := newCommit(subj, msg, v.Commit.Author.Name + " <" + v.Commit.Author.Email + ">", v.Sha)
-			commits = append(commits, c)
+			commits[i] = c
 		}
 
 		strings.Split(string(body), ",")
