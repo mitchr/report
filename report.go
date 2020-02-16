@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -47,10 +48,19 @@ func parseGitLog(gitDir, fmtStr string) []string {
 	return strings.Split(string(out), "\n")
 }
 
+var blameFlag = flag.Bool("blame", false, "show name/e-mail and hash of offenders")
+
 func main() {
+	flag.Parse()
+
 	gitDir := ""
 	if len(os.Args) > 1 {
-		gitDir = os.Args[1]
+		// if the flag is present, the directory will be the next argument
+		if *blameFlag {
+			gitDir = os.Args[2]
+		} else {
+			gitDir = os.Args[1]
+		}
 	} else {
 		// TODO: exit gracefully
 		os.Exit(1)
