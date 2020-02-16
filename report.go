@@ -109,10 +109,10 @@ func main() {
 				Message string
 			}
 		}
-
 		container := []node{}
 		json.Unmarshal([]byte(body), &container)
 
+		// extract commits from unmarshaled JSON
 		commits = make([]*commit, len(container))
 		for i, v := range container {
 			splitMsg := strings.SplitN(v.Commit.Message, "\n\n", 2)
@@ -125,8 +125,6 @@ func main() {
 			c := newCommit(subj, msg, v.Commit.Author.Name + " <" + v.Commit.Author.Email + ">", v.Sha)
 			commits[i] = c
 		}
-
-		strings.Split(string(body), ",")
 	}
 
 	subjScore := 0
