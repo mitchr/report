@@ -148,9 +148,14 @@ func main() {
 
 	// blame(commits)
 
-	fmt.Printf("Percentage of commits with subject lines above 52 characters: %f\n", float64(subjScore)/float64(len(commits)))
-	fmt.Printf("Percentage of commit bodies with lines above 70 characters: %f\n", float64(bodyCommitScore)/float64(len(commits)))
-	fmt.Printf("Percentage of body lines above 70 characters: %f\n", float64(bodyLineScore)/float64(bodyTotal))
+	fmt.Printf("Number of commits with subject lines above 50 characters: %d\n", subjScore)
+	fmt.Printf("Percentage of commits with subject lines above 50 characters: %f\n", float64(subjScore)/float64(len(commits)))
+
+	fmt.Printf("Number of commits with body lines over 72 characters: %d\n", bodyCommitScore)
+	fmt.Printf("Percentage of commit bodies with lines above 72 characters: %f\n", float64(bodyCommitScore)/float64(len(commits)))
+
+	fmt.Printf("Number of body lines (total) over 72 characters: %d\n", bodyLineScore)
+	fmt.Printf("Percentage of body lines above 72 characters: %f\n", float64(bodyLineScore)/float64(bodyTotal))
 	fmt.Printf("Total number of commits in dataset: %d\n", len(commits))
 }
 
