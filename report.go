@@ -156,7 +156,9 @@ func main() {
 		}
 	}
 
-	// blame(commits)
+	if *blameFlag {
+		blame(commits)
+	}
 
 	fmt.Printf("Number of commits with subject lines above 50 characters: %d\n", subjScore)
 	fmt.Printf("Percentage of commits with subject lines above 50 characters: %f\n", 100*float64(subjScore)/float64(len(commits)))
@@ -172,7 +174,14 @@ func main() {
 func blame(c []*commit) {
 	for _, v := range c {
 		if v.subjMarked {
-			fmt.Println(v.author + " went over")
+			fmt.Println(v.author + " went over on subject")
+		}
+
+		if len(v.bodyMarks) != 0 {
+			for _, line := range v.bodyMarks {
+				fmt.Println(v.author + " went over on line")
+				fmt.Printf("The line in question: %d\n", line)
+			}
 		}
 	}
 }

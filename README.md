@@ -19,7 +19,12 @@ For a github repo:
 report author/repo
 ````
 
+To show information about committers that have not followed 50/72:
+````
+report --blame repo/
+````
+
 ## Todo
 * more statistics
 * pagination to access entire commit log (current max is 100)
-* blame
+* ~~blame~~
