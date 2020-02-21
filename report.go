@@ -207,6 +207,9 @@ func paginate(resp *http.Response) string {
 	for _, v := range headerLinks {
 		next := strings.Split(v, ";")
 
+		// TODO: what happens when there is a next page, but we *just* ran
+		// out of api requests? how does it fail? is this even something to
+		// worry about?
 		// only investigate rel=next if there is actually more than one page
 		if len(next) >= 2 {
 			if strings.TrimSpace(next[1]) == `rel="next"` {
