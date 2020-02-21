@@ -49,6 +49,7 @@ func parseGitLog(gitDir, fmtStr string) []string {
 }
 
 var blameFlag = flag.Bool("blame", false, "show name/e-mail and hash of offenders")
+var OAUTH_TOKEN = os.Getenv("OAUTH")
 
 func main() {
 	flag.Parse()
@@ -84,21 +85,10 @@ func main() {
 
 	// if there was no error, its a github repo
 	}	else {
+		// start at first 100 commits
 		url := "https://api.github.com/repos/" + gitDir + "/commits?per_page=100"
 
-		resp, err := http.Get(url)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		defer resp.Body.Close()
-
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// unmarshal json response into node objects
+		// unmarshaled json will be held in this node object
 		type node struct {
 			Sha string
 			Commit struct {
@@ -109,8 +99,48 @@ func main() {
 				Message string
 			}
 		}
+		// TODO: determine how big this container could possibly be by looking at `rel="last"`
 		container := []node{}
-		json.Unmarshal([]byte(body), &container)
+
+		// client used for all http requests
+		client := &http.Client{}
+
+		// while the url is not an empty string, keep paginating through
+		// the commit list until no more pages are left
+		for url != "" {
+			req, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// if the user has an api token, set authorization to get higher rate-limit
+			if OAUTH_TOKEN != "" {
+				req.Header.Set("Authorization", "token " + OAUTH_TOKEN)
+			}
+
+			// create a response object for this url
+			resp, err := client.Do(req)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// read response body
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// close and unmarshal response body into node objects
+			resp.Body.Close()
+
+			// initially unmarshal into temporary array, then append it to the container
+			temp := make([]node, 100)
+			json.Unmarshal([]byte(body), &temp)
+			container = append(container, temp...)
+
+			// get next page in scheme
+			url = paginate(resp)
+		}
 
 		// extract commits from unmarshaled JSON
 		commits = make([]*commit, len(container))
@@ -169,6 +199,22 @@ func main() {
 	fmt.Printf("Number of body lines (total) over 72 characters: %d\n", bodyLineScore)
 	fmt.Printf("Percentage of body lines above 72 characters: %f\n", 100*float64(bodyLineScore)/float64(bodyTotal))
 	fmt.Printf("Total number of commits in dataset: %d\n", len(commits))
+}
+
+// takes a string url and returns the next url in the pagination sequence
+func paginate(resp *http.Response) string {
+	headerLinks := strings.Split(resp.Header.Get("Link"), ",")
+	for _, v := range headerLinks {
+		next := strings.Split(v, ";")
+
+		// only investigate rel=next if there is actually more than one page
+		if len(next) >= 2 {
+			if strings.TrimSpace(next[1]) == `rel="next"` {
+				return strings.Trim(next[0], "<>")
+			}
+		}
+	}
+	return ""
 }
 
 func blame(c []*commit) {
