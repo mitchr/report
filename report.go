@@ -69,8 +69,9 @@ func main() {
 
 	var commits []*commit
 
+	// check if gitDir is a local directory
 	_, err := os.Stat(gitDir)
-	// if there was an error, then this is a local directory
+	// if there was no error, then this is a local directory
 	if err == nil {
 		subjs := parseGitLog(gitDir, "\"%s\"")
 		bodies := parseGitLog(gitDir, "\"%b\"")
