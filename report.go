@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -91,7 +92,7 @@ func main() {
 	// if there was no error, its a github repo
 	}	else {
 		// start at first 100 commits
-		url := "https://api.github.com/repos/" + gitDir + "/commits?per_page=100"
+		repoURL := "https://api.github.com/repos/" + gitDir + "/commits?per_page=100"
 
 		// unmarshaled json will be held in this node object
 		type node struct {
@@ -110,18 +111,21 @@ func main() {
 		// client used for all http requests
 		client := &http.Client{}
 
+		req, err := http.NewRequest("GET", repoURL, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// if the user has an api token, set authorization to get higher rate-limit
+		if OAUTH_TOKEN != "" {
+			req.Header.Set("Authorization", "token " + OAUTH_TOKEN)
+		}
+
 		// while the url is not an empty string, keep paginating through
 		// the commit list until no more pages are left
-		for url != "" {
-			req, err := http.NewRequest("GET", url, nil)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			// if the user has an api token, set authorization to get higher rate-limit
-			if OAUTH_TOKEN != "" {
-				req.Header.Set("Authorization", "token " + OAUTH_TOKEN)
-			}
+		for repoURL != "" {
+			// change the repoURL to the next page
+			req.URL, _ = url.Parse(repoURL)
 
 			// create a response object for this url
 			resp, err := client.Do(req)
@@ -154,7 +158,7 @@ func main() {
 			defer resp.Body.Close()
 
 			// get next page in scheme
-			url = paginate(resp)
+			repoURL = paginate(resp)
 		}
 
 		// extract commits from unmarshaled JSON
@@ -228,6 +232,7 @@ func paginate(resp *http.Response) string {
 		// only investigate rel=next if there is actually more than one page
 		if len(next) >= 2 {
 			if strings.TrimSpace(next[1]) == `rel="next"` {
+				// fmt.Println(next[0])
 				return strings.Trim(next[0], "<>")
 			}
 		}
