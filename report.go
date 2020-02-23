@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -130,19 +129,13 @@ func main() {
 				log.Fatal(err)
 			}
 
-			// read response body
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			// close and unmarshal response body into node objects
-			resp.Body.Close()
-
 			// initially unmarshal into temporary array, then append it to the container
 			temp := make([]node, 100)
-			json.Unmarshal([]byte(body), &temp)
+			json.NewDecoder(resp.Body).Decode(&temp)
+
 			container = append(container, temp...)
+
+			defer resp.Body.Close()
 
 			// get next page in scheme
 			url = paginate(resp)
