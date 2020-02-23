@@ -52,6 +52,10 @@ var blameFlag = flag.Bool("blame", false, "show name/e-mail and hash of offender
 var OAUTH_TOKEN = os.Getenv("OAUTH")
 
 func main() {
+	flag.Usage = func() {
+		fmt.Println("report: determine which commits in a git repo follow the 50/72 rule")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
 	gitDir := ""
@@ -63,8 +67,9 @@ func main() {
 			gitDir = os.Args[1]
 		}
 	} else {
-		// TODO: exit gracefully
-		os.Exit(1)
+		// exit gracefully
+		flag.Usage()
+		return
 	}
 
 	var commits []*commit
