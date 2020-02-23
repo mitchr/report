@@ -133,6 +133,22 @@ func main() {
 			temp := make([]node, 100)
 			json.NewDecoder(resp.Body).Decode(&temp)
 
+			// TODO: use multithreading here instead of this append. I have a
+			// feeling that this is one of the main bottlenecks because append
+			// is being called so much. could also just move the commit
+			// extraction code here instead of looping again at the end of the
+			// for loop. maybe something like
+			// go func() {
+			// 	mutex.Lock()
+			// 	for _, v := temp {
+			// 		splitMsg := ...
+			// 		commit[i] = newCommit(...)
+			// 	}
+			// 	mutex.Unlock()
+			// }
+			// the only problem is that this will add the commits to the slice
+			// out of order, but I don't necessarily know if we care about
+			// keeping them in order considering we never look at the date
 			container = append(container, temp...)
 
 			defer resp.Body.Close()
