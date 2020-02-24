@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	// "strconv"
 	"strings"
 )
 
@@ -133,6 +134,13 @@ func main() {
 				log.Fatal(err)
 			}
 
+			// determine how many pages of commits there are and allocate
+			// enough space for all of them in container
+			// if len(container) == 0 {
+			// 	last, _ := strconv.Atoi(strings.Split(relParse(resp, "last"), "&")[1][5:])
+			// 	container = make([]node, 0, last*100)
+			// }
+
 			// initially unmarshal into temporary array, then append it to the container
 			temp := make([]node, 100)
 			json.NewDecoder(resp.Body).Decode(&temp)
@@ -158,7 +166,7 @@ func main() {
 			defer resp.Body.Close()
 
 			// get next page in scheme
-			repoURL = paginate(resp)
+			repoURL = relParse(resp, "next")
 		}
 
 		// extract commits from unmarshaled JSON
@@ -221,7 +229,7 @@ func main() {
 }
 
 // takes a string url and returns the next url in the pagination sequence
-func paginate(resp *http.Response) string {
+func relParse(resp *http.Response, key string) string {
 	headerLinks := strings.Split(resp.Header.Get("Link"), ",")
 	for _, v := range headerLinks {
 		next := strings.Split(v, ";")
@@ -231,9 +239,8 @@ func paginate(resp *http.Response) string {
 		// worry about?
 		// only investigate rel=next if there is actually more than one page
 		if len(next) >= 2 {
-			if strings.TrimSpace(next[1]) == `rel="next"` {
-				// fmt.Println(next[0])
-				return strings.Trim(next[0], "<>")
+			if strings.TrimSpace(next[1]) == "rel="+"\""+key+"\"" {
+				return strings.Trim(strings.Trim(next[0], " "), "<>")
 			}
 		}
 	}
