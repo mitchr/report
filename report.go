@@ -20,12 +20,12 @@ const (
 
 type commit struct {
 	subject string
-	body string
-	author string
-	hash string
+	body    string
+	author  string
+	hash    string
 
 	subjMarked bool
-	bodyMarks []int
+	bodyMarks  []int
 }
 
 func newCommit(subject, body, author, hash string) *commit {
@@ -41,7 +41,7 @@ func (c *commit) markBody(lineno int) {
 }
 
 func parseGitLog(gitDir, fmtStr string) []string {
-	out, err := exec.Command("git", "--git-dir="+gitDir+"/.git", "log", "--format=" + fmtStr).CombinedOutput()
+	out, err := exec.Command("git", "--git-dir="+gitDir+"/.git", "log", "--format="+fmtStr).CombinedOutput()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -90,17 +90,17 @@ func main() {
 			commits[i] = c
 		}
 
-	// if there was no error, its a github repo
-	}	else {
+		// if there was no error, its a github repo
+	} else {
 		// start at first 100 commits
 		repoURL := "https://api.github.com/repos/" + gitDir + "/commits?per_page=100"
 
 		// unmarshaled json will be held in this node object
 		type node struct {
-			Sha string
+			Sha    string
 			Commit struct {
 				Author struct {
-					Name string
+					Name  string
 					Email string
 				}
 				Message string
@@ -119,7 +119,7 @@ func main() {
 
 		// if the user has an api token, set authorization to get higher rate-limit
 		if OAUTH_TOKEN != "" {
-			req.Header.Set("Authorization", "token " + OAUTH_TOKEN)
+			req.Header.Set("Authorization", "token "+OAUTH_TOKEN)
 		}
 
 		// while the url is not an empty string, keep paginating through
@@ -179,7 +179,7 @@ func main() {
 				msg = splitMsg[1]
 			}
 
-			c := newCommit(subj, msg, v.Commit.Author.Name + " <" + v.Commit.Author.Email + ">", v.Sha)
+			c := newCommit(subj, msg, v.Commit.Author.Name+" <"+v.Commit.Author.Email+">", v.Sha)
 			commits[i] = c
 		}
 	}
