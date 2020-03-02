@@ -32,5 +32,7 @@ report --blame repo/
 
 ## Todo
 * more statistics
+* limit number of concurrent goroutines so we don't hit file descriptor limit (````ulimit -n````)
+	* generate stats for [torvalds/linux](https://github.com/torvalds/linux)
 * ~~pagination to access entire commit log (current max is 100)~~
 * ~~blame~~
