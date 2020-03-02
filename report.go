@@ -9,8 +9,9 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	// "strconv"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -106,11 +107,10 @@ func main() {
 				Message string
 			}
 		}
-		// TODO: determine how big this container could possibly be by looking at `rel="last"`
-		container := []node{}
 
 		// client used for all http requests
-		client := &http.Client{}
+		// http.DefaultTransport.(*http.Transport).TLSHandshakeTimeout = time.Minute * 2
+		client := http.DefaultClient
 
 		req, err := http.NewRequest("GET", repoURL, nil)
 		if err != nil {
@@ -122,66 +122,79 @@ func main() {
 			req.Header.Set("Authorization", "token "+OAUTH_TOKEN)
 		}
 
-		// while the url is not an empty string, keep paginating through
-		// the commit list until no more pages are left
-		for repoURL != "" {
-			// change the repoURL to the next page
-			req.URL, _ = url.Parse(repoURL)
-
-			// create a response object for this url
-			resp, err := client.Do(req)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			// determine how many pages of commits there are and allocate
-			// enough space for all of them in container
-			// if len(container) == 0 {
-			// 	last, _ := strconv.Atoi(strings.Split(relParse(resp, "last"), "&")[1][5:])
-			// 	container = make([]node, 0, last*100)
-			// }
-
-			// initially unmarshal into temporary array, then append it to the container
-			temp := make([]node, 100)
-			json.NewDecoder(resp.Body).Decode(&temp)
-
-			// TODO: use multithreading here instead of this append. I have a
-			// feeling that this is one of the main bottlenecks because append
-			// is being called so much. could also just move the commit
-			// extraction code here instead of looping again at the end of the
-			// for loop. maybe something like
-			// go func() {
-			// 	mutex.Lock()
-			// 	for _, v := temp {
-			// 		splitMsg := ...
-			// 		commit[i] = newCommit(...)
-			// 	}
-			// 	mutex.Unlock()
-			// }
-			// the only problem is that this will add the commits to the slice
-			// out of order, but I don't necessarily know if we care about
-			// keeping them in order considering we never look at the date
-			container = append(container, temp...)
-
-			defer resp.Body.Close()
-
-			// get next page in scheme
-			repoURL = relParse(resp, "next")
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		// extract commits from unmarshaled JSON
-		commits = make([]*commit, len(container))
-		for i, v := range container {
-			splitMsg := strings.SplitN(v.Commit.Message, "\n\n", 2)
-			subj := splitMsg[0]
-			msg := ""
-			if len(splitMsg) > 1 {
-				msg = splitMsg[1]
-			}
+		baseURL := relParse(resp, "next")
+		lastPage := 1
+		// if there was more than one page of commits
+		if baseURL != "" {
+			baseURL = baseURL[:len(baseURL)-1]
 
-			c := newCommit(subj, msg, v.Commit.Author.Name+" <"+v.Commit.Author.Email+">", v.Sha)
-			commits[i] = c
+			last := strings.Split(relParse(resp, "last"), "&page=")[1]
+
+			// allocate enough space for all commits
+			lastPage, _ = strconv.Atoi(last)
+			commits = make([]*commit, lastPage*100)
+		} else {
+			commits = make([]*commit, 100)
 		}
+
+		// for every page of commits, spin up a new goroutine that will parse the
+		// json into the appropriate commit structure
+		i := 1
+		var wg sync.WaitGroup
+		for i <= lastPage {
+			// increment WaitGroup counter
+			wg.Add(1)
+
+			go func(i int) {
+				// when this goroutine finishes, decrement wg counter
+				defer wg.Done()
+
+				// pageReq := req
+				// pageReq.URL, _ = url.Parse(baseURL + strconv.Itoa(i))
+				pageReq, _ := http.NewRequest("GET", baseURL+strconv.Itoa(i), nil)
+				pageReq.Close = true
+
+				// small check for if there is only one page of commits
+				if lastPage == 1 {
+					pageReq.URL, _ = url.Parse(repoURL)
+				}
+
+				// if the user has an api token, set authorization to get higher rate-limit
+				if OAUTH_TOKEN != "" {
+					pageReq.Header.Set("Authorization", "token "+OAUTH_TOKEN)
+				}
+
+				resp, err := client.Do(pageReq)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				temp := make([]node, 100)
+				json.NewDecoder(resp.Body).Decode(&temp)
+				resp.Body.Close()
+
+				for k, v := range temp {
+					splitMsg := strings.SplitN(v.Commit.Message, "\n\n", 2)
+					subj := splitMsg[0]
+					msg := ""
+					if len(splitMsg) > 1 {
+						msg = splitMsg[1]
+					}
+
+					c := newCommit(subj, msg, v.Commit.Author.Name+" <"+v.Commit.Author.Email+">", v.Sha)
+					commits[(i-1)*100+k] = c
+				}
+			}(i)
+			i++
+		}
+
+		// wait for all goroutines to finish before computing statistics
+		wg.Wait()
 	}
 
 	subjScore := 0
@@ -190,25 +203,27 @@ func main() {
 	bodyTotal := 0
 
 	for _, c := range commits {
-		if len(c.subject) > SUBJ_MAX {
-			subjScore++
-			c.markSubj()
-		}
+		if c != nil {
+			if len(c.subject) > SUBJ_MAX {
+				subjScore++
+				c.markSubj()
+			}
 
-		body := strings.Split(c.body, "\n")
-		for lineno, line := range body {
-			bodyTotal++
-			if len(line) > BODY_MAX {
-				bodyLineScore++
+			body := strings.Split(c.body, "\n")
+			for lineno, line := range body {
+				bodyTotal++
+				if len(line) > BODY_MAX {
+					bodyLineScore++
 
-				// if this commit body has not been marked before, then this is
-				// this first line in that body that has gone over the BODY_MAX
-				// tolerance. we increment bodyCommitScore
-				if len(c.bodyMarks) == 0 {
-					bodyCommitScore++
+					// if this commit body has not been marked before, then this is
+					// this first line in that body that has gone over the BODY_MAX
+					// tolerance. we increment bodyCommitScore
+					if len(c.bodyMarks) == 0 {
+						bodyCommitScore++
+					}
+
+					c.markBody(lineno)
 				}
-
-				c.markBody(lineno)
 			}
 		}
 	}
@@ -217,18 +232,21 @@ func main() {
 		blame(commits)
 	}
 
+	nonNilCommits := len(commits) - countNil(commits)
+
 	fmt.Printf("Number of commits with subject lines above 50 characters: %d\n", subjScore)
-	fmt.Printf("Percentage of commits with subject lines above 50 characters: %f\n", 100*float64(subjScore)/float64(len(commits)))
+	fmt.Printf("Percentage of commits with subject lines above 50 characters: %f\n", 100*float64(subjScore)/float64(nonNilCommits))
 
 	fmt.Printf("Number of commits with body lines over 72 characters: %d\n", bodyCommitScore)
-	fmt.Printf("Percentage of commit bodies with lines above 72 characters: %f\n", 100*float64(bodyCommitScore)/float64(len(commits)))
+	fmt.Printf("Percentage of commit bodies with lines above 72 characters: %f\n", 100*float64(bodyCommitScore)/float64(nonNilCommits))
 
 	fmt.Printf("Number of body lines (total) over 72 characters: %d\n", bodyLineScore)
 	fmt.Printf("Percentage of body lines above 72 characters: %f\n", 100*float64(bodyLineScore)/float64(bodyTotal))
-	fmt.Printf("Total number of commits in dataset: %d\n", len(commits))
+	fmt.Printf("Total number of commits in dataset: %d\n", nonNilCommits)
 }
 
 // takes a string url and returns the next url in the pagination sequence
+// returns empty string if rel url could not be parsed from given key
 func relParse(resp *http.Response, key string) string {
 	headerLinks := strings.Split(resp.Header.Get("Link"), ",")
 	for _, v := range headerLinks {
@@ -260,4 +278,15 @@ func blame(c []*commit) {
 			}
 		}
 	}
+}
+
+// counts number of nil elements in slice
+func countNil(vals []*commit) int {
+	count := 0
+	for _, v := range vals {
+		if v == nil {
+			count++
+		}
+	}
+	return count
 }
