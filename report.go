@@ -234,14 +234,14 @@ func main() {
 
 	nonNilCommits := len(commits) - countNil(commits)
 
-	fmt.Printf("Number of commits with subject lines above 50 characters: %d\n", subjScore)
-	fmt.Printf("Percentage of commits with subject lines above 50 characters: %f\n", 100*float64(subjScore)/float64(nonNilCommits))
+	fmt.Printf("Number of commits with subject lines above %d characters: %d\n", SUBJ_MAX, subjScore)
+	fmt.Printf("Percentage of commits with subject lines above %d characters: %f\n", SUBJ_MAX, 100*float64(subjScore)/float64(nonNilCommits))
 
-	fmt.Printf("Number of commits with body lines over 72 characters: %d\n", bodyCommitScore)
-	fmt.Printf("Percentage of commit bodies with lines above 72 characters: %f\n", 100*float64(bodyCommitScore)/float64(nonNilCommits))
+	fmt.Printf("Number of commits with body lines over %d characters: %d\n", BODY_MAX, bodyCommitScore)
+	fmt.Printf("Percentage of commit bodies with lines above %d characters: %f\n", BODY_MAX, 100*float64(bodyCommitScore)/float64(nonNilCommits))
 
-	fmt.Printf("Number of body lines (total) over 72 characters: %d\n", bodyLineScore)
-	fmt.Printf("Percentage of body lines above 72 characters: %f\n", 100*float64(bodyLineScore)/float64(bodyTotal))
+	fmt.Printf("Number of body lines (total) over %d characters: %d\n", BODY_MAX, bodyLineScore)
+	fmt.Printf("Percentage of body lines above %d characters: %f\n", BODY_MAX, 100*float64(bodyLineScore)/float64(bodyTotal))
 	fmt.Printf("Total number of commits in dataset: %d\n", nonNilCommits)
 }
 
